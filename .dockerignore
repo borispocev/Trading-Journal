@@ -1,0 +1,38 @@
+# Dependencies & build output
+node_modules/
+.next/
+out/
+dist/
+*.tsbuildinfo
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Local SQLite database (private trading data)
+data/*
+!data/.gitkeep
+
+# Uploaded screenshots (private trading data)
+public/uploads/*
+!public/uploads/.gitkeep
+
+# Any stray screenshot dump
+journal-photos/
+
+# CSV exports placed at the repo root (real trade history — keep out)
+/*.csv
+
+# Editor / OS / tooling
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Claude Code session data
+.claude/
