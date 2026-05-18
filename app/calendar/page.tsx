@@ -1,6 +1,7 @@
 import { getDb, type Trade } from "@/lib/db";
 import { dailyPnlMap } from "@/lib/stats";
 import { enrichTradesWithFees, asNetTrades } from "@/lib/commissions";
+import { requireUser } from "@/lib/auth";
 import CalendarView from "@/components/CalendarView";
 
 export const dynamic = "force-dynamic";
@@ -22,10 +23,13 @@ function parseMonth(input: string | undefined): { year: number; month: number } 
 
 export default function CalendarPage({ searchParams }: { searchParams: SearchParams }) {
   const { year, month } = parseMonth(searchParams.month);
+  const user = requireUser();
 
   const db = getDb();
-  const raw = db.prepare("SELECT * FROM trades").all() as Trade[];
-  const netTrades = asNetTrades(enrichTradesWithFees(db, raw));
+  const raw = db
+    .prepare("SELECT * FROM trades WHERE user_id = ?")
+    .all(user.id) as Trade[];
+  const netTrades = asNetTrades(enrichTradesWithFees(db, user.id, raw));
   const dayMap = dailyPnlMap(netTrades);
 
   const dayData: Record<string, { pnl: number; trades: number }> = {};

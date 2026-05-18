@@ -7,6 +7,7 @@ import {
   tradesPerTradingDay,
 } from "@/lib/stats";
 import { enrichTradesWithFees, asNetTrades } from "@/lib/commissions";
+import { requireUser } from "@/lib/auth";
 import StatCard from "@/components/StatCard";
 import EquityChart from "@/components/EquityChart";
 import PnlBarChart from "@/components/PnlBarChart";
@@ -78,11 +79,14 @@ function IconScale() {
 }
 
 export default function DashboardPage() {
+  const user = requireUser();
   const db = getDb();
   const raw = db
-    .prepare("SELECT * FROM trades ORDER BY entry_time DESC")
-    .all() as Trade[];
-  const enriched = enrichTradesWithFees(db, raw);
+    .prepare(
+      "SELECT * FROM trades WHERE user_id = ? ORDER BY entry_time DESC"
+    )
+    .all(user.id) as Trade[];
+  const enriched = enrichTradesWithFees(db, user.id, raw);
   const netTrades = asNetTrades(enriched);
   const stats = computeStats(netTrades);
   const byDay = pnlByDay(netTrades);
@@ -93,10 +97,11 @@ export default function DashboardPage() {
     .prepare(
       `SELECT name, account_size, trailing_drawdown, min_withdraw, max_withdraw
        FROM accounts
+       WHERE user_id = ?
        ORDER BY is_active DESC, id ASC
        LIMIT 1`
     )
-    .get() as
+    .get(user.id) as
     | {
         name: string;
         account_size: number | null;

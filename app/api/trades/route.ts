@@ -1,16 +1,21 @@
 import { NextResponse } from "next/server";
 import { getDb, type Trade } from "@/lib/db";
 import { enrichTradesWithFees } from "@/lib/commissions";
+import { getCurrentUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
 export async function GET() {
+  const user = getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const db = getDb();
   const trades = db
-    .prepare("SELECT * FROM trades ORDER BY entry_time DESC LIMIT 500")
-    .all() as Trade[];
-  const enriched = enrichTradesWithFees(db, trades);
-  // Slim payload — the picker only needs identifying fields + P&L.
+    .prepare(
+      "SELECT * FROM trades WHERE user_id = ? ORDER BY entry_time DESC LIMIT 500"
+    )
+    .all(user.id) as Trade[];
+  const enriched = enrichTradesWithFees(db, user.id, trades);
   return NextResponse.json(
     enriched.map((t) => ({
       id: t.id,

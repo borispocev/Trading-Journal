@@ -1,17 +1,25 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import Sidebar from "@/components/Sidebar";
+import AppShell from "@/components/AppShell";
+import { getCurrentUser } from "@/lib/auth";
 
 export const metadata: Metadata = {
   title: "Tradovate Journal",
   description: "Personal trading journal for Tradovate / Apex prop accounts",
 };
 
+export const dynamic = "force-dynamic";
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const user = getCurrentUser();
+  const shellUser = user
+    ? { email: user.email, is_admin: user.is_admin === 1 }
+    : null;
+
   return (
     <html lang="en">
       <head>
@@ -23,14 +31,7 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <main className="flex-1 overflow-x-hidden">
-            <div className="mx-auto max-w-[1400px] px-6 md:px-10 py-8">
-              {children}
-            </div>
-          </main>
-        </div>
+        <AppShell user={shellUser}>{children}</AppShell>
       </body>
     </html>
   );

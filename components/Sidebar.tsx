@@ -1,9 +1,43 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 type IconProps = { className?: string };
+
+function IconShield({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <path
+        d="M12 3l8 3v6c0 5-3.5 8.5-8 9-4.5-.5-8-4-8-9V6l8-3Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9 12l2 2 4-4"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconLogout({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <path
+        d="M15 17l5-5-5-5M20 12H9M12 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 function IconDashboard({ className }: IconProps) {
   return (
@@ -77,6 +111,36 @@ function IconUpload({ className }: IconProps) {
     </svg>
   );
 }
+function IconCalculator({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <rect
+        x="5"
+        y="3"
+        width="14"
+        height="18"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+      <rect
+        x="8"
+        y="6"
+        width="8"
+        height="3"
+        rx="0.5"
+        stroke="currentColor"
+        strokeWidth="1.4"
+      />
+      <path
+        d="M9 13h.01M12 13h.01M15 13h.01M9 17h.01M12 17h.01M15 17h.01"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
 function IconSettings({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className}>
@@ -96,12 +160,25 @@ const NAV: { href: string; label: string; Icon: (p: IconProps) => JSX.Element }[
   { href: "/calendar", label: "Calendar", Icon: IconCalendar },
   { href: "/trades", label: "Trades", Icon: IconList },
   { href: "/journal", label: "Journal", Icon: IconBook },
+  { href: "/position-calculator", label: "Position Calc", Icon: IconCalculator },
   { href: "/import", label: "Import", Icon: IconUpload },
   { href: "/settings", label: "Settings", Icon: IconSettings },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({
+  user,
+}: {
+  user: { email: string; is_admin: boolean } | null;
+}) {
   const pathname = usePathname();
+  const router = useRouter();
+
+  async function logout() {
+    await fetch("/api/auth/logout", { method: "POST" });
+    router.push("/login");
+    router.refresh();
+  }
+
   return (
     <aside className="w-60 shrink-0 min-h-screen p-4 border-r border-bg-border bg-bg-panel/60 backdrop-blur-sm flex flex-col">
       <Link href="/" className="flex items-center gap-2.5 mb-8 px-1.5 group">
@@ -158,16 +235,52 @@ export default function Sidebar() {
             </Link>
           );
         })}
+        {user?.is_admin && (
+          <Link
+            href="/admin"
+            className={`relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
+              pathname.startsWith("/admin")
+                ? "bg-bg-card text-slate-50"
+                : "text-slate-400 hover:bg-bg-card/60 hover:text-slate-100"
+            }`}
+          >
+            {pathname.startsWith("/admin") && (
+              <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-r bg-accent" />
+            )}
+            <IconShield
+              className={`h-[18px] w-[18px] ${
+                pathname.startsWith("/admin") ? "text-accent" : "text-slate-500"
+              }`}
+            />
+            <span className="font-medium">Admin</span>
+          </Link>
+        )}
       </nav>
 
-      <div className="mt-auto pt-6">
-        <div className="rounded-lg border border-bg-border bg-bg-card/60 p-3">
-          <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500 mb-1">
-            Account
+      <div className="mt-auto pt-6 space-y-2">
+        {user && (
+          <div className="rounded-lg border border-bg-border bg-bg-card/60 p-3">
+            <div className="text-[11px] uppercase tracking-[0.18em] text-slate-500 mb-1">
+              Signed in
+            </div>
+            <div
+              className="text-sm font-medium text-slate-200 truncate"
+              title={user.email}
+            >
+              {user.email}
+            </div>
+            <div className="text-[11px] text-slate-500 mt-0.5">
+              {user.is_admin ? "Admin" : "User"}
+            </div>
           </div>
-          <div className="text-sm font-medium text-slate-200">Apex PA1</div>
-          <div className="text-[11px] text-slate-500 mt-0.5">Futures · Prop</div>
-        </div>
+        )}
+        <button
+          onClick={logout}
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-400 hover:bg-bg-card/60 hover:text-slate-100 transition-all"
+        >
+          <IconLogout className="h-4 w-4" />
+          <span>Sign out</span>
+        </button>
       </div>
     </aside>
   );

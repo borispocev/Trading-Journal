@@ -19,15 +19,22 @@ export type RateTable = {
   defaultPerSide: number;
 };
 
-export function loadRateTable(db: Database.Database): RateTable {
+export function loadRateTable(
+  db: Database.Database,
+  userId: number
+): RateTable {
   const rows = db
-    .prepare("SELECT root, rate_per_side FROM commission_rates")
-    .all() as Pick<CommissionRate, "root" | "rate_per_side">[];
+    .prepare(
+      "SELECT root, rate_per_side FROM commission_rates WHERE user_id = ?"
+    )
+    .all(userId) as Pick<CommissionRate, "root" | "rate_per_side">[];
   const bySymbol = new Map<string, number>();
   for (const r of rows) bySymbol.set(r.root.toUpperCase(), Number(r.rate_per_side));
   const def = db
-    .prepare("SELECT value FROM app_settings WHERE key = 'default_commission_per_side'")
-    .get() as { value: string } | undefined;
+    .prepare(
+      "SELECT value FROM app_settings WHERE user_id = ? AND key = 'default_commission_per_side'"
+    )
+    .get(userId) as { value: string } | undefined;
   const defaultPerSide = def ? Number(def.value) : 0.74;
   return { bySymbol, defaultPerSide };
 }
@@ -69,9 +76,10 @@ export function asNetTrades(enriched: EnrichedTrade[]): Trade[] {
  */
 export function enrichTradesWithFees(
   db: Database.Database,
+  userId: number,
   trades: Trade[]
 ): EnrichedTrade[] {
-  const rates = loadRateTable(db);
+  const rates = loadRateTable(db, userId);
   return trades.map((t) => {
     const gross = t.pnl;
     const fees = feesForTrade(t.symbol, t.qty, rates);

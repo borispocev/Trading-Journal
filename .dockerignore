@@ -1,0 +1,36 @@
+# Build artifacts & deps — rebuilt inside the image
+node_modules
+.next
+out
+dist
+*.tsbuildinfo
+
+# Local-only data
+data
+public/uploads
+journal-photos
+
+# CSVs at repo root (private trade history)
+/*.csv
+sample-data
+
+# Env / secrets
+.env
+.env.*
+
+# VCS / editors / tooling
+.git
+.github
+.gitignore
+.gitattributes
+.vscode
+.idea
+.claude
+
+# Docs (not needed at runtime)
+README.md
+
+# OS junk
+.DS_Store
+Thumbs.db
+*.log

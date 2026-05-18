@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -10,22 +11,28 @@ function toNum(v: unknown): number | null {
 }
 
 export async function GET() {
+  const user = getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const db = getDb();
   const rows = db
     .prepare(
       `SELECT id, name, account_size, max_daily_loss, trailing_drawdown,
               min_withdraw, max_withdraw, is_active, created_at
        FROM accounts
+       WHERE user_id = ?
        ORDER BY is_active DESC, name ASC`
     )
-    .all();
+    .all(user.id);
   return NextResponse.json(rows);
 }
 
 export async function POST(req: NextRequest) {
+  const user = getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const body = await req.json();
 
-  // Activate-only path: { activate: <id> } makes that account the active one.
   if (body.activate !== undefined && body.activate !== null) {
     const db = getDb();
     const id = Number(body.activate);
@@ -33,8 +40,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "invalid id" }, { status: 400 });
     }
     const tx = db.transaction(() => {
-      db.prepare("UPDATE accounts SET is_active = 0").run();
-      db.prepare("UPDATE accounts SET is_active = 1 WHERE id = ?").run(id);
+      db.prepare("UPDATE accounts SET is_active = 0 WHERE user_id = ?").run(user.id);
+      db.prepare(
+        "UPDATE accounts SET is_active = 1 WHERE id = ? AND user_id = ?"
+      ).run(id, user.id);
     });
     tx();
     return NextResponse.json({ ok: true });
@@ -51,15 +60,16 @@ export async function POST(req: NextRequest) {
   const db = getDb();
   db.prepare(
     `INSERT INTO accounts
-       (name, account_size, max_daily_loss, trailing_drawdown, min_withdraw, max_withdraw)
-     VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT(name) DO UPDATE SET
+       (user_id, name, account_size, max_daily_loss, trailing_drawdown, min_withdraw, max_withdraw)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(user_id, name) DO UPDATE SET
        account_size = excluded.account_size,
        max_daily_loss = excluded.max_daily_loss,
        trailing_drawdown = excluded.trailing_drawdown,
        min_withdraw = excluded.min_withdraw,
        max_withdraw = excluded.max_withdraw`
   ).run(
+    user.id,
     name,
     account_size,
     max_daily_loss,
@@ -68,26 +78,33 @@ export async function POST(req: NextRequest) {
     max_withdraw
   );
 
-  // If no account is active yet, mark the first inserted one active.
   const activeCount = db
-    .prepare("SELECT COUNT(*) as c FROM accounts WHERE is_active = 1")
-    .get() as { c: number };
+    .prepare(
+      "SELECT COUNT(*) as c FROM accounts WHERE user_id = ? AND is_active = 1"
+    )
+    .get(user.id) as { c: number };
   if (activeCount.c === 0) {
     db.prepare(
-      "UPDATE accounts SET is_active = 1 WHERE id = (SELECT id FROM accounts ORDER BY id ASC LIMIT 1)"
-    ).run();
+      "UPDATE accounts SET is_active = 1 WHERE id = (SELECT id FROM accounts WHERE user_id = ? ORDER BY id ASC LIMIT 1)"
+    ).run(user.id);
   }
 
   return NextResponse.json({ ok: true });
 }
 
 export async function DELETE(req: NextRequest) {
+  const user = getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { id } = await req.json();
   const numId = Number(id);
   if (!Number.isFinite(numId)) {
     return NextResponse.json({ error: "invalid id" }, { status: 400 });
   }
   const db = getDb();
-  db.prepare("DELETE FROM accounts WHERE id = ?").run(numId);
+  db.prepare("DELETE FROM accounts WHERE id = ? AND user_id = ?").run(
+    numId,
+    user.id
+  );
   return NextResponse.json({ ok: true });
 }

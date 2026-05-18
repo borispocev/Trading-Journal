@@ -1,5 +1,6 @@
 import { getDb, type Trade } from "@/lib/db";
 import { enrichTradesWithFees } from "@/lib/commissions";
+import { requireUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -19,11 +20,14 @@ function fmtDuration(s: number | null) {
 }
 
 export default function TradesPage() {
+  const user = requireUser();
   const db = getDb();
   const raw = db
-    .prepare("SELECT * FROM trades ORDER BY entry_time DESC")
-    .all() as Trade[];
-  const trades = enrichTradesWithFees(db, raw);
+    .prepare(
+      "SELECT * FROM trades WHERE user_id = ? ORDER BY entry_time DESC"
+    )
+    .all(user.id) as Trade[];
+  const trades = enrichTradesWithFees(db, user.id, raw);
 
   const totalGross = trades.reduce((s, t) => s + (t.gross_pnl ?? 0), 0);
   const totalFees = trades.reduce((s, t) => s + t.fees_calc, 0);
