@@ -102,6 +102,27 @@ export function getDb(): Database.Database {
       FOREIGN KEY (journal_entry_id) REFERENCES journal_entries(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS withdrawals (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      amount REAL NOT NULL,
+      withdraw_date TEXT NOT NULL,
+      note TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_withdrawals_user_date ON withdrawals(user_id, withdraw_date);
+
+    CREATE TABLE IF NOT EXISTS withdrawal_photos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      withdrawal_id INTEGER NOT NULL,
+      file_path TEXT NOT NULL,
+      caption TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (withdrawal_id) REFERENCES withdrawals(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS accounts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
@@ -246,6 +267,23 @@ export type JournalEntry = {
 export type JournalPhoto = {
   id: number;
   journal_entry_id: number;
+  file_path: string;
+  caption: string | null;
+  created_at: string;
+};
+
+export type Withdrawal = {
+  id: number;
+  user_id: number;
+  amount: number;
+  withdraw_date: string;
+  note: string | null;
+  created_at: string;
+};
+
+export type WithdrawalPhoto = {
+  id: number;
+  withdrawal_id: number;
   file_path: string;
   caption: string | null;
   created_at: string;

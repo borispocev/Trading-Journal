@@ -516,14 +516,14 @@ function DangerZone() {
   const [msg, setMsg] = useState<string | null>(null);
 
   async function reset(
-    target: "trades" | "journal" | "accounts" | "all",
+    target: "trades" | "journal" | "withdrawals" | "accounts" | "all",
     label: string
   ) {
     if (
       !confirm(
         `Delete all ${label}? This cannot be undone.${
           target === "all"
-            ? "\n\nThis will wipe trades, journal entries (with photos), and accounts."
+            ? "\n\nThis will wipe trades, journal entries (with photos), withdrawals (with certificates), and accounts."
             : ""
         }`
       )
@@ -575,6 +575,13 @@ function DangerZone() {
           {busy === "journal" ? "Clearing..." : "Clear journal"}
         </button>
         <button
+          onClick={() => reset("withdrawals", "withdrawals (and certificates)")}
+          disabled={busy !== null}
+          className="btn btn-ghost"
+        >
+          {busy === "withdrawals" ? "Clearing..." : "Clear withdrawals"}
+        </button>
+        <button
           onClick={() => reset("accounts", "accounts")}
           disabled={busy !== null}
           className="btn btn-ghost"
@@ -582,7 +589,7 @@ function DangerZone() {
           {busy === "accounts" ? "Clearing..." : "Clear accounts"}
         </button>
         <button
-          onClick={() => reset("all", "data (trades + journal + accounts)")}
+          onClick={() => reset("all", "data (trades + journal + withdrawals + accounts)")}
           disabled={busy !== null}
           className="btn btn-danger"
         >

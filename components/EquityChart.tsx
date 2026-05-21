@@ -17,7 +17,33 @@ type Point = {
   date: string;
   account_value: number;
   trail_stop: number;
+  withdrawal?: number;
 };
+
+// Custom dot for the account line: an amber marker on points where cash was
+// withdrawn, nothing on ordinary trade points.
+function WithdrawalDot(props: {
+  cx?: number;
+  cy?: number;
+  index?: number;
+  payload?: Point;
+}) {
+  const { cx, cy, payload, index } = props;
+  if (cx == null || cy == null || !payload || !(payload.withdrawal! > 0)) {
+    return <g key={`wd-${index}`} />;
+  }
+  return (
+    <circle
+      key={`wd-${index}`}
+      cx={cx}
+      cy={cy}
+      r={4.5}
+      fill="#fbbf24"
+      stroke="#0a0d12"
+      strokeWidth={2}
+    />
+  );
+}
 
 type Props = {
   data: Point[];
@@ -173,7 +199,7 @@ export default function EquityChart({
             stroke="#22d3a4"
             strokeWidth={2.2}
             fill="url(#equityFill)"
-            dot={false}
+            dot={<WithdrawalDot />}
             activeDot={{
               r: 4,
               fill: "#22d3a4",

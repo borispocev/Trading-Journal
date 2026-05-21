@@ -74,50 +74,85 @@ export type AccountEquityPoint = {
   account_value: number;
   trail_stop: number;
   pnl: number;
+  withdrawal: number; // cash withdrawn at this point; 0 for trade points
 };
+
+export type WithdrawalEvent = { date: string; amount: number };
+
+// Apex locks the trailing stop $100 ABOVE the starting balance (e.g. a 50K
+// account locks at $50,100 once equity surpasses start + trailingDD + $100).
+export const APEX_TRAIL_LOCK_OFFSET = 100;
 
 /**
  * Builds an account-value equity curve with a per-point Apex-style trailing
- * drawdown stop. Trailing stop = max(peak_pnl, 0) − trailingDD, clamped so it
- * never exceeds the starting balance (Apex behavior: trail locks at starting
- * balance once peak equity reaches start + threshold).
+ * drawdown stop, threading withdrawals in as step-downs.
+ *
+ * - account_value = startingBalance + cumulativePnL − cumulativeWithdrawals
+ * - trail_stop    = startingBalance + peakPnL − trailingDD, clamped so it never
+ *   exceeds start + $100 (Apex locks the trail $100 above starting balance once
+ *   peak equity reaches start + trailingDD + $100).
+ *
+ * A withdrawal lowers the account value but NOT the peak, so pulling cash out
+ * shrinks your balance without moving the locked drawdown floor — matching how
+ * Apex treats payouts (cash off the table, not a trading loss).
  */
 export function accountEquityCurve(
   trades: Trade[],
   startingBalance: number,
-  trailingDrawdown: number
+  trailingDrawdown: number,
+  withdrawals: WithdrawalEvent[] = []
 ): AccountEquityPoint[] {
+  const lockCap = startingBalance + APEX_TRAIL_LOCK_OFFSET;
+
   const closed = trades
     .filter((t) => t.pnl !== null && t.exit_time)
     .sort((a, b) => (a.exit_time! < b.exit_time! ? -1 : 1));
 
+  // Merge trade fills and withdrawals into one chronological event stream.
+  // Withdrawals only carry a date, so anchor them at end-of-day — that keeps a
+  // payout after any trades closed the same day.
+  type Ev = { time: string; pnl: number; withdrawal: number };
+  const events: Ev[] = [];
+  for (const t of closed) {
+    events.push({ time: t.exit_time!, pnl: t.pnl ?? 0, withdrawal: 0 });
+  }
+  for (const w of withdrawals) {
+    if (!w.date || !(w.amount > 0)) continue;
+    const time = w.date.length <= 10 ? `${w.date}T23:59:59` : w.date;
+    events.push({ time, pnl: 0, withdrawal: w.amount });
+  }
+  events.sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0));
+
   let running = 0;
   let peak = 0;
+  let withdrawn = 0;
   const out: AccountEquityPoint[] = [];
 
-  // Seed point at the first trade's entry for a visual "starts at $X" anchor.
-  if (closed.length > 0) {
-    const start = closed[0];
+  // Seed point for a visual "starts at $X" anchor: first trade's entry if we
+  // have trades, otherwise the first event.
+  const seedDate = closed.length > 0 ? closed[0].entry_time : events[0]?.time;
+  if (seedDate) {
     out.push({
-      date: start.entry_time,
+      date: seedDate,
       account_value: startingBalance,
-      trail_stop: startingBalance - trailingDrawdown,
+      trail_stop: Math.min(lockCap, startingBalance - trailingDrawdown),
       pnl: 0,
+      withdrawal: 0,
     });
   }
 
-  for (const t of closed) {
-    running += t.pnl ?? 0;
+  for (const e of events) {
+    running += e.pnl;
     if (running > peak) peak = running;
-    const trail = Math.min(
-      startingBalance,
-      startingBalance + peak - trailingDrawdown
-    );
+    withdrawn += e.withdrawal;
+    const trail = Math.min(lockCap, startingBalance + peak - trailingDrawdown);
     out.push({
-      date: t.exit_time!,
-      account_value: Math.round((startingBalance + running) * 100) / 100,
+      date: e.time,
+      account_value:
+        Math.round((startingBalance + running - withdrawn) * 100) / 100,
       trail_stop: Math.round(trail * 100) / 100,
-      pnl: t.pnl ?? 0,
+      pnl: e.pnl,
+      withdrawal: e.withdrawal,
     });
   }
   return out;

@@ -98,6 +98,29 @@ function IconBook({ className }: IconProps) {
     </svg>
   );
 }
+function IconWithdraw({ className }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className}>
+      <rect
+        x="3"
+        y="6"
+        width="18"
+        height="12"
+        rx="2"
+        stroke="currentColor"
+        strokeWidth="1.6"
+      />
+      <circle cx="12" cy="12" r="2.5" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="M12 9.5v-3m0 0-1.2 1.2M12 6.5l1.2 1.2"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 function IconUpload({ className }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className}>
@@ -160,6 +183,7 @@ const NAV: { href: string; label: string; Icon: (p: IconProps) => JSX.Element }[
   { href: "/calendar", label: "Calendar", Icon: IconCalendar },
   { href: "/trades", label: "Trades", Icon: IconList },
   { href: "/journal", label: "Journal", Icon: IconBook },
+  { href: "/withdrawals", label: "Withdrawals", Icon: IconWithdraw },
   { href: "/position-calculator", label: "Position Calc", Icon: IconCalculator },
   { href: "/import", label: "Import", Icon: IconUpload },
   { href: "/settings", label: "Settings", Icon: IconSettings },

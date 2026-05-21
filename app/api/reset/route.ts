@@ -6,7 +6,7 @@ import fs from "fs";
 
 export const runtime = "nodejs";
 
-const VALID = new Set(["trades", "journal", "accounts", "all"]);
+const VALID = new Set(["trades", "journal", "withdrawals", "accounts", "all"]);
 const UPLOAD_DIR =
   process.env.UPLOAD_DIR || path.join(process.cwd(), "public", "uploads");
 
@@ -54,6 +54,36 @@ export async function POST(req: NextRequest) {
       .run(user.id).changes;
     counts.journal = db
       .prepare("DELETE FROM journal_entries WHERE user_id = ?")
+      .run(user.id).changes;
+  }
+  if (target === "withdrawals" || target === "all") {
+    // Unlink certificate images first, scoped to this user via the join.
+    const certPaths = db
+      .prepare(
+        `SELECT p.file_path
+           FROM withdrawal_photos p
+           JOIN withdrawals w ON w.id = p.withdrawal_id
+          WHERE w.user_id = ?`
+      )
+      .all(user.id) as { file_path: string }[];
+
+    for (const p of certPaths) {
+      const base = path.basename(p.file_path);
+      try {
+        fs.unlinkSync(path.join(UPLOAD_DIR, base));
+      } catch {}
+    }
+
+    counts.withdrawal_photos = db
+      .prepare(
+        `DELETE FROM withdrawal_photos
+          WHERE withdrawal_id IN (
+            SELECT id FROM withdrawals WHERE user_id = ?
+          )`
+      )
+      .run(user.id).changes;
+    counts.withdrawals = db
+      .prepare("DELETE FROM withdrawals WHERE user_id = ?")
       .run(user.id).changes;
   }
   if (target === "accounts" || target === "all") {

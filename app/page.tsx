@@ -122,11 +122,25 @@ export default function DashboardPage() {
     ? account.max_withdraw
     : startingBalance + FALLBACK_MAX_WITHDRAW_OFFSET;
 
-  const equity = accountEquityCurve(netTrades, startingBalance, trailingDD);
+  // Withdrawals are deducted from account equity (cash off the table, not a
+  // trading loss) — they step the curve down but don't move the trailing stop.
+  const withdrawalRows = db
+    .prepare(
+      "SELECT amount, withdraw_date FROM withdrawals WHERE user_id = ? ORDER BY withdraw_date ASC, id ASC"
+    )
+    .all(user.id) as { amount: number; withdraw_date: string }[];
+  const totalWithdrawn = withdrawalRows.reduce((s, w) => s + w.amount, 0);
+
+  const equity = accountEquityCurve(
+    netTrades,
+    startingBalance,
+    trailingDD,
+    withdrawalRows.map((w) => ({ date: w.withdraw_date, amount: w.amount }))
+  );
   const currentValue =
     equity.length > 0
       ? equity[equity.length - 1].account_value
-      : startingBalance;
+      : startingBalance - totalWithdrawn;
 
   const tradesPerDay = tradesPerTradingDay(netTrades);
   const targets: { label: string; value: number }[] = [];
@@ -212,12 +226,19 @@ export default function DashboardPage() {
                 <div>
                   <div className="section-label">Equity Curve</div>
                   <div className="text-xs text-slate-500 mt-0.5">
-                    Account value · Apex {fmt(startingBalance).replace(".00", "")} rules
+                    Account {fmt(currentValue)} · Apex{" "}
+                    {fmt(startingBalance).replace(".00", "")} rules
+                    {totalWithdrawn > 0 && (
+                      <> · withdrawn {fmt(totalWithdrawn)}</>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-3 text-[11px]">
                   <Legend color="#22d3a4" label="Account" solid />
                   <Legend color="#f87171" label="Trail stop" dashed />
+                  {totalWithdrawn > 0 && (
+                    <Legend color="#fbbf24" label="Withdrawal" dot />
+                  )}
                 </div>
               </div>
               <EquityChart
@@ -320,21 +341,30 @@ function Legend({
   label,
   dashed,
   solid,
+  dot,
 }: {
   color: string;
   label: string;
   dashed?: boolean;
   solid?: boolean;
+  dot?: boolean;
 }) {
   return (
     <span className="inline-flex items-center gap-1.5 text-slate-400">
-      <span
-        className="inline-block h-[2px] w-5 rounded"
-        style={{
-          background: solid ? color : "transparent",
-          borderTop: dashed ? `2px dashed ${color}` : undefined,
-        }}
-      />
+      {dot ? (
+        <span
+          className="inline-block h-2 w-2 rounded-full"
+          style={{ background: color }}
+        />
+      ) : (
+        <span
+          className="inline-block h-[2px] w-5 rounded"
+          style={{
+            background: solid ? color : "transparent",
+            borderTop: dashed ? `2px dashed ${color}` : undefined,
+          }}
+        />
+      )}
       {label}
     </span>
   );
